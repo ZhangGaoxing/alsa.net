@@ -1,0 +1,10 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netcoreapp2.1</TargetFramework>
+    <RootNamespace>Iot.Device.Media</RootNamespace>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <LangVersion>preview</LangVersion>
+  </PropertyGroup>
+
+</Project>
