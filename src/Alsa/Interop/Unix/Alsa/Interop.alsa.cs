@@ -33,7 +33,7 @@ internal partial class Interop
     internal static extern int snd_pcm_recover(IntPtr pcm, int err, int silent);
 
     [DllImport(AlsaLibrary)]
-    internal static extern int snd_pcm_writei(IntPtr pcm, IntPtr buffer, uint size);
+    internal static extern long snd_pcm_writei(IntPtr pcm, IntPtr buffer, ulong size);
 
     [DllImport(AlsaLibrary)]
     internal static extern int snd_pcm_set_params(IntPtr pcm, snd_pcm_format_t format, snd_pcm_access_t access, uint channels, uint rate, int soft_resample, uint latency);

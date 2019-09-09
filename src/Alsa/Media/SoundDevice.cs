@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Text;
 
 namespace Iot.Device.Media
@@ -22,6 +23,8 @@ namespace Iot.Device.Media
         /// The connection settings of the sound device.
         /// </summary>
         public abstract SoundConnectionSettings Settings { get; }
+
+        public abstract void Play(Stream wavStream);
 
         public void Dispose()
         {

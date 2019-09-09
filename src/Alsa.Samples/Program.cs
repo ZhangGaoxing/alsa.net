@@ -12,7 +12,7 @@ namespace Alsa.Samples
             UnixSoundDevice device = new UnixSoundDevice(settings);
 
             using FileStream fs = File.Open("/home/pi/1.wav", FileMode.Open);
-            device.PlayInitialize(fs);
+            device.Play(fs);
 
             Console.ReadKey();
         }

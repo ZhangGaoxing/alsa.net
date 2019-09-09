@@ -25,6 +25,24 @@ namespace Iot.Device.Media
             DevicePath = DefaultDevicePath;
         }
 
+        public override unsafe void Play(Stream wavStream)
+        {
+            IntPtr @params = new IntPtr();
+            ulong frames, bufferSize;
+            uint val = 0;
+            int dir = 0;
+            WavHeader header = GetWavHeader(wavStream);
+
+            Open();
+            PlayInitialize(header, ref @params, ref val, ref dir);
+
+            Interop.snd_pcm_hw_params_get_period_size(@params, &frames, &dir);
+
+            bufferSize = frames * header.BlockAlign;
+
+            Close();
+        }
+
         private WavHeader GetWavHeader(Stream wavStream)
         {
             Span<byte> readBuffer2 = stackalloc byte[2];
@@ -76,60 +94,87 @@ namespace Iot.Device.Media
             return header;
         }
 
-        public unsafe void PlayInitialize(Stream wavStream)
+        private unsafe void PlayInitialize(WavHeader header, ref IntPtr @params, ref uint val, ref int dir)
         {
-            var header = GetWavHeader(wavStream);
+            if (Interop.snd_pcm_hw_params_malloc(ref @params) < 0)
+            {
+                throw new Exception($"Error {Marshal.GetLastWin32Error()}. Can not allocate parameters object.");
+            }
 
-            IntPtr @params = new IntPtr();
-            ulong frames;
-            uint val;
-            int dir = 0;
+            if (Interop.snd_pcm_hw_params_any(pcm, @params) < 0)
+            {
+                throw new Exception($"Error {Marshal.GetLastWin32Error()}. Can not fill parameters object.");
+            }
 
-            int error = Interop.snd_pcm_open(ref pcm, "default", snd_pcm_stream_t.SND_PCM_STREAM_PLAYBACK, 0);
+            if (Interop.snd_pcm_hw_params_set_access(pcm, @params, snd_pcm_access_t.SND_PCM_ACCESS_RW_INTERLEAVED) < 0)
+            {
+                throw new Exception($"Error {Marshal.GetLastWin32Error()}. Can not set access mode.");
+            }
+
+            int error = (int)(header.BitsPerSample / 8) switch
+            {
+                1 => Interop.snd_pcm_hw_params_set_format(pcm, @params, snd_pcm_format_t.SND_PCM_FORMAT_U8),
+                2 => Interop.snd_pcm_hw_params_set_format(pcm, @params, snd_pcm_format_t.SND_PCM_FORMAT_S16_LE),
+                3 => Interop.snd_pcm_hw_params_set_format(pcm, @params, snd_pcm_format_t.SND_PCM_FORMAT_S24_LE),
+                _ => throw new Exception("Bits per sample error."),
+            };
+
             if (error < 0)
             {
-                Console.WriteLine(Marshal.GetLastWin32Error());
-            }
-            error = Interop.snd_pcm_hw_params_malloc(ref @params);
-            if (error < 0)
-            {
-                Console.WriteLine(Marshal.GetLastWin32Error());
-            }
-            error = Interop.snd_pcm_hw_params_any(pcm, @params);
-            if (error < 0)
-            {
-                Console.WriteLine(Marshal.GetLastWin32Error());
-            }
-            error = Interop.snd_pcm_hw_params_set_access(pcm, @params, snd_pcm_access_t.SND_PCM_ACCESS_RW_INTERLEAVED);
-            if (error < 0)
-            {
-                Console.WriteLine(Marshal.GetLastWin32Error());
+                throw new Exception($"Error {Marshal.GetLastWin32Error()}. Can not set format.");
             }
 
-            switch (header.BitsPerSample / 8)
+            if (Interop.snd_pcm_hw_params_set_channels(pcm, @params, header.NumChannels) < 0)
             {
-                case 1:
-                    Interop.snd_pcm_hw_params_set_format(pcm, @params, snd_pcm_format_t.SND_PCM_FORMAT_U8);
-                    break;
-                case 2:
-                    Interop.snd_pcm_hw_params_set_format(pcm, @params, snd_pcm_format_t.SND_PCM_FORMAT_S16_LE);
-                    break;
-                case 3:
-                    Interop.snd_pcm_hw_params_set_format(pcm, @params, snd_pcm_format_t.SND_PCM_FORMAT_S24_LE);
-                    break;
-                default:
-                    throw new ArgumentOutOfRangeException();
+                throw new Exception($"Error {Marshal.GetLastWin32Error()}. Can not set channel.");
             }
 
-            Interop.snd_pcm_hw_params_set_channels(pcm, @params, header.NumChannels);
-            Interop.snd_pcm_hw_params_set_rate_near(pcm, @params, &val, &dir);
-            Interop.snd_pcm_hw_params(pcm, @params);
-            Interop.snd_pcm_hw_params_get_period_size(@params, &frames, &dir);
+            fixed (uint* valP = &val)
+            {
+                fixed (int* dirP = &dir)
+                {
+                    if (Interop.snd_pcm_hw_params_set_rate_near(pcm, @params, valP, dirP) < 0)
+                    {
+                        throw new Exception($"Error {Marshal.GetLastWin32Error()}. Can not set rate.");
+                    }
+                }
+            }
 
-            Console.WriteLine($"{frames}  {dir}");
+            if (Interop.snd_pcm_hw_params(pcm, @params) < 0)
+            {
+                throw new Exception($"Error {Marshal.GetLastWin32Error()}. Can not set hardware parameters.");
+            }
+        }
 
-            Interop.snd_pcm_drain(pcm);
-            Interop.snd_pcm_close(pcm);
+        private void Open()
+        {
+            if (pcm != default)
+            {
+                return;
+            }
+
+            if (Interop.snd_pcm_open(ref pcm, "default", snd_pcm_stream_t.SND_PCM_STREAM_PLAYBACK, 0) < 0)
+            {
+                throw new Exception($"Error {Marshal.GetLastWin32Error()}. Can not open sound device.");
+            }
+        }
+
+        private void Close()
+        {
+            if (pcm != default)
+            {
+                if (Interop.snd_pcm_drain(pcm) < 0)
+                {
+                    throw new Exception($"Error {Marshal.GetLastWin32Error()}. Drain sound device error.");
+                }
+
+                if (Interop.snd_pcm_close(pcm) < 0)
+                {
+                    throw new Exception($"Error {Marshal.GetLastWin32Error()}. Close sound device error.");
+                }
+
+                pcm = default;
+            }
         }
 
         protected override void Dispose(bool disposing)
