@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Iot.Device.Media
 {
@@ -15,16 +17,23 @@ namespace Iot.Device.Media
         public static SoundDevice Create(SoundConnectionSettings settings) => new UnixSoundDevice(settings);
 
         /// <summary>
-        /// Path to sound resources located on the platform.
-        /// </summary>
-        public abstract string DevicePath { get; set; }
-
-        /// <summary>
         /// The connection settings of the sound device.
         /// </summary>
         public abstract SoundConnectionSettings Settings { get; }
 
-        public abstract void Play(Stream wavStream);
+        /// <summary>
+        /// Play WAV file.
+        /// </summary>
+        /// <param name="wavPath">WAV file path.</param>
+        /// <param name="token">A cancellation token that can be used to cancel the work.</param>
+        public abstract Task PlayAsync(string wavPath, CancellationToken token);
+
+        /// <summary>
+        /// Play WAV file.
+        /// </summary>
+        /// <param name="wavStream">WAV stream.</param>
+        /// <param name="token">A cancellation token that can be used to cancel the work.</param>
+        public abstract Task PlayAsync(Stream wavStream, CancellationToken token);
 
         public void Dispose()
         {

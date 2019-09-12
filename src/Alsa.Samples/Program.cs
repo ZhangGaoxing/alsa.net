@@ -1,19 +1,21 @@
 ﻿using System;
 using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
 using Iot.Device.Media;
 
 namespace Alsa.Samples
 {
     class Program
     {
-        static void Main(string[] args)
+        static async Task Main(string[] args)
         {
-            SoundConnectionSettings settings = new SoundConnectionSettings(1);
+            SoundConnectionSettings settings = new SoundConnectionSettings();
             UnixSoundDevice device = new UnixSoundDevice(settings);
 
-            using FileStream fs = File.Open("/home/pi/1.wav", FileMode.Open);
-            device.Play(fs);
+            await device.PlayAsync("/home/pi/1.wav", CancellationToken.None);
 
+            Console.WriteLine(111);
             Console.ReadKey();
         }
     }

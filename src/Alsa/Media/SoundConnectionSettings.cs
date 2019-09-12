@@ -7,17 +7,8 @@ namespace Iot.Device.Media
     public class SoundConnectionSettings
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="SoundConnectionSettings"/> class.
+        /// The device name of the sound device is connected to.
         /// </summary>
-        /// <param name="busId">The bus ID the sound device is connected to.</param>
-        public SoundConnectionSettings(int busId)
-        {
-            BusId = busId;
-        }
-
-        /// <summary>
-        /// The bus ID the sound device is connected to.
-        /// </summary>
-        public int BusId { get; }
+        public string DeviceName { get; set; } = "default";
     }
 }

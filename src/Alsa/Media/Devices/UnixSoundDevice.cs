@@ -4,42 +4,74 @@ using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Iot.Device.Media
 {
     public class UnixSoundDevice : SoundDevice
     {
         private IntPtr pcm;
-        private const string DefaultDevicePath = "/dev/snd";
-        private const int BufferCount = 4;
-        private int _deviceFileDescriptor = -1;
         private static readonly object s_initializationLock = new object();
-
-        public override string DevicePath { get; set; }
 
         public override SoundConnectionSettings Settings { get; }
 
         public UnixSoundDevice(SoundConnectionSettings settings)
         {
             Settings = settings;
-            DevicePath = DefaultDevicePath;
         }
 
-        public override unsafe void Play(Stream wavStream)
+        /// <summary>
+        /// Play WAV file.
+        /// </summary>
+        /// <param name="wavPath">WAV file path.</param>
+        /// <param name="token">A cancellation token that can be used to cancel the work.</param>
+        public override async Task PlayAsync(string wavPath, CancellationToken token)
+        {
+            using FileStream fs = File.Open(wavPath, FileMode.Open);
+
+            try
+            {
+                await Task.Run(() =>
+                {
+                    Play(fs);
+                }, token);
+            }
+            catch (TaskCanceledException)
+            {
+                Close();
+            }
+        }
+
+        /// <summary>
+        /// Play WAV file.
+        /// </summary>
+        /// <param name="wavStream">WAV stream.</param>
+        /// <param name="token">A cancellation token that can be used to cancel the work.</param>
+        public override async Task PlayAsync(Stream wavStream, CancellationToken token)
+        {
+            try
+            {
+                await Task.Run(() =>
+                {
+                    Play(wavStream);
+                }, token);
+            }
+            catch (TaskCanceledException)
+            {
+                Close();
+            }
+        }
+
+        private void Play(Stream wavStream)
         {
             IntPtr @params = new IntPtr();
-            ulong frames, bufferSize;
-            uint val = 0;
             int dir = 0;
             WavHeader header = GetWavHeader(wavStream);
 
             Open();
-            PlayInitialize(header, ref @params, ref val, ref dir);
-
-            Interop.snd_pcm_hw_params_get_period_size(@params, &frames, &dir);
-
-            bufferSize = frames * header.BlockAlign;
-
+            PlayInitialize(header, ref @params, ref dir);
+            WriteBuffer(wavStream, header, ref @params, ref dir);
             Close();
         }
 
@@ -101,7 +133,36 @@ namespace Iot.Device.Media
             return header;
         }
 
-        private unsafe void PlayInitialize(WavHeader header, ref IntPtr @params, ref uint val, ref int dir)
+        private unsafe void WriteBuffer(Stream wavStream, WavHeader header, ref IntPtr @params, ref int dir)
+        {
+            ulong frames, bufferSize;
+            fixed (int* dirP = &dir)
+            {
+                if (Interop.snd_pcm_hw_params_get_period_size(@params, &frames, dirP) < 0)
+                {
+                    throw new Exception($"Error {Marshal.GetLastWin32Error()}. Can not get period size.");
+                }
+            }
+
+            bufferSize = frames * header.BlockAlign;
+            // In Interop, the frames is defined as ulong. But actucally, the value of bufferSize won't be too big.
+            Span<byte> readBuffer = stackalloc byte[(int)bufferSize];
+            // Jump wav header.
+            wavStream.Position = 44;
+
+            fixed (byte* buffer = readBuffer)
+            {
+                while (wavStream.Read(readBuffer) != 0)
+                {
+                    if (Interop.snd_pcm_writei(pcm, (IntPtr)buffer, bufferSize) < 0)
+                    {
+                        throw new Exception($"Error {Marshal.GetLastWin32Error()}. Can not write buffer to the device.");
+                    }
+                }
+            }
+        }
+
+        private unsafe void PlayInitialize(WavHeader header, ref IntPtr @params, ref int dir)
         {
             if (Interop.snd_pcm_hw_params_malloc(ref @params) < 0)
             {
@@ -136,14 +197,12 @@ namespace Iot.Device.Media
                 throw new Exception($"Error {Marshal.GetLastWin32Error()}. Can not set channel.");
             }
 
-            fixed (uint* valP = &val)
+            uint val = header.SampleRate;
+            fixed (int* dirP = &dir)
             {
-                fixed (int* dirP = &dir)
+                if (Interop.snd_pcm_hw_params_set_rate_near(pcm, @params, &val, dirP) < 0)
                 {
-                    if (Interop.snd_pcm_hw_params_set_rate_near(pcm, @params, valP, dirP) < 0)
-                    {
-                        throw new Exception($"Error {Marshal.GetLastWin32Error()}. Can not set rate.");
-                    }
+                    throw new Exception($"Error {Marshal.GetLastWin32Error()}. Can not set rate.");
                 }
             }
 
@@ -160,9 +219,12 @@ namespace Iot.Device.Media
                 return;
             }
 
-            if (Interop.snd_pcm_open(ref pcm, "default", snd_pcm_stream_t.SND_PCM_STREAM_PLAYBACK, 0) < 0)
+            lock (s_initializationLock)
             {
-                throw new Exception($"Error {Marshal.GetLastWin32Error()}. Can not open sound device.");
+                if (Interop.snd_pcm_open(ref pcm, Settings.DeviceName, snd_pcm_stream_t.SND_PCM_STREAM_PLAYBACK, 0) < 0)
+                {
+                    throw new Exception($"Error {Marshal.GetLastWin32Error()}. Can not open sound device.");
+                }
             }
         }
 
@@ -170,9 +232,9 @@ namespace Iot.Device.Media
         {
             if (pcm != default)
             {
-                if (Interop.snd_pcm_drain(pcm) < 0)
+                if (Interop.snd_pcm_drop(pcm) < 0)
                 {
-                    throw new Exception($"Error {Marshal.GetLastWin32Error()}. Drain sound device error.");
+                    throw new Exception($"Error {Marshal.GetLastWin32Error()}. Drop sound device error.");
                 }
 
                 if (Interop.snd_pcm_close(pcm) < 0)
@@ -187,6 +249,11 @@ namespace Iot.Device.Media
         protected override void Dispose(bool disposing)
         {
             base.Dispose(disposing);
+        }
+
+        private string SndError(int errornum)
+        {
+            return Marshal.PtrToStringAnsi(Interop.snd_strerror(errornum));
         }
     }
 }
