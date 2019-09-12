@@ -22,6 +22,11 @@ namespace Iot.Device.Media
         public abstract SoundConnectionSettings Settings { get; }
 
         /// <summary>
+        /// The playback volume of the sound device
+        /// </summary>
+        public abstract long Volume { get; set; }
+
+        /// <summary>
         /// Play WAV file.
         /// </summary>
         /// <param name="wavPath">WAV file path.</param>

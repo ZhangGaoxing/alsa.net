@@ -12,9 +12,13 @@ namespace Iot.Device.Media
     public class UnixSoundDevice : SoundDevice
     {
         private IntPtr pcm;
-        private static readonly object s_initializationLock = new object();
+        private IntPtr mixer;
+        private static readonly object pcmInitializationLock = new object();
+        private static readonly object mixerInitializationLock = new object();
 
         public override SoundConnectionSettings Settings { get; }
+
+        public override long Volume { get => GetVolume(); set => SetVolume(value); }
 
         public UnixSoundDevice(SoundConnectionSettings settings)
         {
@@ -39,7 +43,7 @@ namespace Iot.Device.Media
             }
             catch (TaskCanceledException)
             {
-                Close();
+                ClosePcm();
             }
         }
 
@@ -59,7 +63,7 @@ namespace Iot.Device.Media
             }
             catch (TaskCanceledException)
             {
-                Close();
+                ClosePcm();
             }
         }
 
@@ -69,10 +73,10 @@ namespace Iot.Device.Media
             int dir = 0;
             WavHeader header = GetWavHeader(wavStream);
 
-            Open();
+            OpenPcm();
             PlayInitialize(header, ref @params, ref dir);
             WriteStream(wavStream, header, ref @params, ref dir);
-            Close();
+            ClosePcm();
         }
 
         private WavHeader GetWavHeader(Stream wavStream)
@@ -212,14 +216,50 @@ namespace Iot.Device.Media
             }
         }
 
-        private void Open()
+        private unsafe void SetVolume(long volume)
+        {
+            OpenMixer();
+
+            IntPtr elem = Interop.snd_mixer_first_elem(mixer);
+
+            if (Interop.snd_mixer_selem_set_playback_volume(elem, snd_mixer_selem_channel_id.SND_MIXER_SCHN_FRONT_LEFT, volume) < 0)
+            {
+                throw new Exception($"Error {Marshal.GetLastWin32Error()}. Set left channel volume error.");
+            }
+
+            if (Interop.snd_mixer_selem_set_playback_volume(elem, snd_mixer_selem_channel_id.SND_MIXER_SCHN_FRONT_RIGHT, volume) < 0)
+            {
+                throw new Exception($"Error {Marshal.GetLastWin32Error()}. Set right channel volume error.");
+            }
+
+            CloseMixer();
+        }
+
+        private unsafe long GetVolume()
+        {
+            OpenMixer();
+
+            long volume;
+            IntPtr elem = Interop.snd_mixer_first_elem(mixer);
+
+            if (Interop.snd_mixer_selem_get_playback_volume(elem, snd_mixer_selem_channel_id.SND_MIXER_SCHN_FRONT_LEFT, &volume) < 0)
+            {
+                throw new Exception($"Error {Marshal.GetLastWin32Error()}. Get volume error.");
+            }
+
+            CloseMixer();
+
+            return volume;
+        }
+
+        private void OpenPcm()
         {
             if (pcm != default)
             {
                 return;
             }
 
-            lock (s_initializationLock)
+            lock (pcmInitializationLock)
             {
                 if (Interop.snd_pcm_open(ref pcm, Settings.DeviceName, snd_pcm_stream_t.SND_PCM_STREAM_PLAYBACK, 0) < 0)
                 {
@@ -228,7 +268,7 @@ namespace Iot.Device.Media
             }
         }
 
-        private void Close()
+        private void ClosePcm()
         {
             if (pcm != default)
             {
@@ -243,6 +283,50 @@ namespace Iot.Device.Media
                 }
 
                 pcm = default;
+            }
+        }
+
+        private void OpenMixer()
+        {
+            if (mixer != default)
+            {
+                return;
+            }
+
+            lock (mixerInitializationLock)
+            {
+                if (Interop.snd_mixer_open(ref mixer, 0) < 0)
+                {
+                    throw new Exception($"Error {Marshal.GetLastWin32Error()}. Can not open sound device mixer.");
+                }
+
+                if (Interop.snd_mixer_attach(mixer, Settings.DeviceName) < 0)
+                {
+                    throw new Exception($"Error {Marshal.GetLastWin32Error()}. Can not attach sound device mixer.");
+                }
+
+                if (Interop.snd_mixer_selem_register(mixer, IntPtr.Zero, IntPtr.Zero) < 0)
+                {
+                    throw new Exception($"Error {Marshal.GetLastWin32Error()}. Can not register sound device mixer.");
+                }
+
+                if (Interop.snd_mixer_load(mixer) < 0)
+                {
+                    throw new Exception($"Error {Marshal.GetLastWin32Error()}. Can not load sound device mixer.");
+                }
+            }
+        }
+
+        private void CloseMixer()
+        {
+            if (mixer != default)
+            {
+                if (Interop.snd_mixer_close(mixer) < 0)
+                {
+                    throw new Exception($"Error {Marshal.GetLastWin32Error()}. Close sound device mixer error.");
+                }
+
+                mixer = default;
             }
         }
 

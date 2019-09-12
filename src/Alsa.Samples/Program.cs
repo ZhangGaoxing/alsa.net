@@ -13,9 +13,11 @@ namespace Alsa.Samples
             SoundConnectionSettings settings = new SoundConnectionSettings();
             UnixSoundDevice device = new UnixSoundDevice(settings);
 
-            await device.PlayAsync("/home/pi/1.wav", CancellationToken.None);
+            //await device.PlayAsync("/home/pi/1.wav", CancellationToken.None);
 
-            Console.WriteLine(111);
+            device.Volume = 10;
+            Console.WriteLine(device.Volume);
+
             Console.ReadKey();
         }
     }
