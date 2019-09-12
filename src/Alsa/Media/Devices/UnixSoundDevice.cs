@@ -71,7 +71,7 @@ namespace Iot.Device.Media
 
             Open();
             PlayInitialize(header, ref @params, ref dir);
-            WriteBuffer(wavStream, header, ref @params, ref dir);
+            WriteStream(wavStream, header, ref @params, ref dir);
             Close();
         }
 
@@ -133,7 +133,7 @@ namespace Iot.Device.Media
             return header;
         }
 
-        private unsafe void WriteBuffer(Stream wavStream, WavHeader header, ref IntPtr @params, ref int dir)
+        private unsafe void WriteStream(Stream wavStream, WavHeader header, ref IntPtr @params, ref int dir)
         {
             ulong frames, bufferSize;
             fixed (int* dirP = &dir)
@@ -144,9 +144,9 @@ namespace Iot.Device.Media
                 }
             }
 
-            bufferSize = frames * header.BlockAlign;
+            bufferSize = frames * header.BlockAlign * header.NumChannels;
             // In Interop, the frames is defined as ulong. But actucally, the value of bufferSize won't be too big.
-            Span<byte> readBuffer = stackalloc byte[(int)bufferSize];
+            byte[] readBuffer = new byte[(int)bufferSize];
             // Jump wav header.
             wavStream.Position = 44;
 
