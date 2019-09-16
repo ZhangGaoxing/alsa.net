@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Buffers.Binary;
-using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -9,7 +8,10 @@ using System.Threading.Tasks;
 
 namespace Iot.Device.Media
 {
-    public class UnixSoundDevice : SoundDevice
+    /// <summary>
+    /// Represents a communications channel to a sound device running on Unix.
+    /// </summary>
+    internal class UnixSoundDevice : SoundDevice
     {
         private IntPtr playbackPcm;
         private IntPtr recordingPcm;
@@ -19,10 +21,20 @@ namespace Iot.Device.Media
         private static readonly object recordingInitializationLock = new object();
         private static readonly object mixerInitializationLock = new object();
 
+        /// <summary>
+        /// The connection settings of the sound device.
+        /// </summary>
         public override SoundConnectionSettings Settings { get; }
 
+        /// <summary>
+        /// The playback volume of the sound device.
+        /// </summary>
         public override long Volume { get => GetVolume(); set => SetVolume(value); }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="UnixSoundDevice"/> class that will use the specified settings to communicate with the sound device.
+        /// </summary>
+        /// <param name="settings">The connection settings of a sound device.</param>
         public UnixSoundDevice(SoundConnectionSettings settings)
         {
             Settings = settings;

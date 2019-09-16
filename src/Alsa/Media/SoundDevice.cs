@@ -1,12 +1,13 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace Iot.Device.Media
 {
+    /// <summary>
+    /// The communications channel to a sound device.
+    /// </summary>
     public abstract partial class SoundDevice : IDisposable
     {
         /// <summary>
@@ -22,7 +23,7 @@ namespace Iot.Device.Media
         public abstract SoundConnectionSettings Settings { get; }
 
         /// <summary>
-        /// The playback volume of the sound device
+        /// The playback volume of the sound device.
         /// </summary>
         public abstract long Volume { get; set; }
 
@@ -56,12 +57,17 @@ namespace Iot.Device.Media
         /// <param name="token">A cancellation token that can be used to cancel the work.</param>
         public abstract Task ReccordAsync(uint second, Stream saveStream, CancellationToken token);
 
+        /// <inheritdoc/>
         public void Dispose()
         {
             Dispose(true);
             GC.SuppressFinalize(this);
         }
 
+        /// <summary>
+        /// Releases the unmanaged resources used by the SoundDevice and optionally releases the managed resources.
+        /// </summary>
+        /// <param name="disposing">True to release both managed and unmanaged resources; false to release only unmanaged resources.</param>
         protected virtual void Dispose(bool disposing) { }
     }
 }
