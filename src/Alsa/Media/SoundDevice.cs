@@ -40,6 +40,22 @@ namespace Iot.Device.Media
         /// <param name="token">A cancellation token that can be used to cancel the work.</param>
         public abstract Task PlayAsync(Stream wavStream, CancellationToken token);
 
+        /// <summary>
+        /// Sound recording.
+        /// </summary>
+        /// <param name="second">Recording duration(In seconds).</param>
+        /// <param name="savePath">Recording save path.</param>
+        /// <param name="token">A cancellation token that can be used to cancel the work.</param>
+        public abstract Task ReccordAsync(uint second, string savePath, CancellationToken token);
+
+        /// <summary>
+        /// Sound recording.
+        /// </summary>
+        /// <param name="second">Recording duration(In seconds).</param>
+        /// <param name="saveStream">Recording save stream.</param>
+        /// <param name="token">A cancellation token that can be used to cancel the work.</param>
+        public abstract Task ReccordAsync(uint second, Stream saveStream, CancellationToken token);
+
         public void Dispose()
         {
             Dispose(true);

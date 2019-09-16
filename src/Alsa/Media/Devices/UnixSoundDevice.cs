@@ -11,9 +11,12 @@ namespace Iot.Device.Media
 {
     public class UnixSoundDevice : SoundDevice
     {
-        private IntPtr pcm;
+        private IntPtr playbackPcm;
+        private IntPtr recordingPcm;
         private IntPtr mixer;
-        private static readonly object pcmInitializationLock = new object();
+        private int errorNum;
+        private static readonly object playbackInitializationLock = new object();
+        private static readonly object recordingInitializationLock = new object();
         private static readonly object mixerInitializationLock = new object();
 
         public override SoundConnectionSettings Settings { get; }
@@ -43,7 +46,7 @@ namespace Iot.Device.Media
             }
             catch (TaskCanceledException)
             {
-                ClosePcm();
+                ClosePlaybackPcm();
             }
         }
 
@@ -63,7 +66,51 @@ namespace Iot.Device.Media
             }
             catch (TaskCanceledException)
             {
-                ClosePcm();
+                ClosePlaybackPcm();
+            }
+        }
+
+        /// <summary>
+        /// Sound recording.
+        /// </summary>
+        /// <param name="second">Recording duration(In seconds).</param>
+        /// <param name="savePath">Recording save path.</param>
+        /// <param name="token">A cancellation token that can be used to cancel the work.</param>
+        public override async Task ReccordAsync(uint second, string savePath, CancellationToken token)
+        {
+            using FileStream fs = File.Open(savePath, FileMode.CreateNew);
+
+            try
+            {
+                await Task.Run(() =>
+                {
+                    Record(fs, second);
+                }, token);
+            }
+            catch (TaskCanceledException)
+            {
+                CloseRecordingPcm();
+            }
+        }
+
+        /// <summary>
+        /// Sound recording.
+        /// </summary>
+        /// <param name="second">Recording duration(In seconds).</param>
+        /// <param name="saveStream">Recording save stream.</param>
+        /// <param name="token">A cancellation token that can be used to cancel the work.</param>
+        public override async Task ReccordAsync(uint second, Stream saveStream, CancellationToken token)
+        {
+            try
+            {
+                await Task.Run(() =>
+                {
+                    Record(saveStream, second);
+                }, token);
+            }
+            catch (TaskCanceledException)
+            {
+                ClosePlaybackPcm();
             }
         }
 
@@ -73,10 +120,93 @@ namespace Iot.Device.Media
             int dir = 0;
             WavHeader header = GetWavHeader(wavStream);
 
-            OpenPcm();
-            PlayInitialize(header, ref @params, ref dir);
+            OpenPlaybackPcm();
+            PcmInitialize(playbackPcm, header, ref @params, ref dir);
             WriteStream(wavStream, header, ref @params, ref dir);
-            ClosePcm();
+            ClosePlaybackPcm();
+        }
+
+        private void Record(Stream saveStream, uint second)
+        {
+            IntPtr @params = new IntPtr();
+            int dir = 0;
+            WavHeader header = new WavHeader
+            {
+                ChunkId = new[] { 'R', 'I', 'F', 'F' },
+                ChunkSize = second * Settings.RecordingSampleRate * Settings.RecordingBitsPerSample * Settings.RecordingChannels / 8 + 36,
+                Format = new[] { 'W', 'A', 'V', 'E' },
+                Subchunk1ID = new[] { 'f', 'm', 't', ' ' },
+                Subchunk1Size = 16,
+                AudioFormat = 1,
+                NumChannels = Settings.RecordingChannels,
+                SampleRate = Settings.RecordingSampleRate,
+                ByteRate = Settings.RecordingSampleRate * Settings.RecordingBitsPerSample * Settings.RecordingChannels / 8,
+                BlockAlign = (ushort)(Settings.RecordingBitsPerSample * Settings.RecordingChannels / 8),
+                BitsPerSample = Settings.RecordingBitsPerSample,
+                Subchunk2Id = new[] { 'd', 'a', 't', 'a' },
+                Subchunk2Size = second * Settings.RecordingSampleRate * Settings.RecordingBitsPerSample * Settings.RecordingChannels / 8
+            };
+
+            SetWavHeader(saveStream, header);
+
+            OpenRecordingPcm();
+            PcmInitialize(recordingPcm, header, ref @params, ref dir);
+            ReadStream(saveStream, header, ref @params, ref dir);
+            CloseRecordingPcm();
+        }
+
+        private void SetWavHeader(Stream wavStream, WavHeader header)
+        {
+            Span<byte> writeBuffer2 = stackalloc byte[2];
+            Span<byte> writeBuffer4 = stackalloc byte[4];
+
+            wavStream.Position = 0;
+
+            try
+            {
+                Encoding.ASCII.GetBytes(header.ChunkId, writeBuffer4);
+                wavStream.Write(writeBuffer4);
+
+                BinaryPrimitives.WriteUInt32LittleEndian(writeBuffer4, header.ChunkSize);
+                wavStream.Write(writeBuffer4);
+
+                Encoding.ASCII.GetBytes(header.Format, writeBuffer4);
+                wavStream.Write(writeBuffer4);
+
+                Encoding.ASCII.GetBytes(header.Subchunk1ID, writeBuffer4);
+                wavStream.Write(writeBuffer4);
+
+                BinaryPrimitives.WriteUInt32LittleEndian(writeBuffer4, header.Subchunk1Size);
+                wavStream.Write(writeBuffer4);
+
+                BinaryPrimitives.WriteUInt16LittleEndian(writeBuffer2, header.AudioFormat);
+                wavStream.Write(writeBuffer2);
+
+                BinaryPrimitives.WriteUInt16LittleEndian(writeBuffer2, header.NumChannels);
+                wavStream.Write(writeBuffer2);
+
+                BinaryPrimitives.WriteUInt32LittleEndian(writeBuffer4, header.SampleRate);
+                wavStream.Write(writeBuffer4);
+
+                BinaryPrimitives.WriteUInt32LittleEndian(writeBuffer4, header.ByteRate);
+                wavStream.Write(writeBuffer4);
+
+                BinaryPrimitives.WriteUInt16LittleEndian(writeBuffer2, header.BlockAlign);
+                wavStream.Write(writeBuffer2);
+
+                BinaryPrimitives.WriteUInt16LittleEndian(writeBuffer2, header.BitsPerSample);
+                wavStream.Write(writeBuffer2);
+
+                Encoding.ASCII.GetBytes(header.Subchunk2Id, writeBuffer4);
+                wavStream.Write(writeBuffer4);
+
+                BinaryPrimitives.WriteUInt32LittleEndian(writeBuffer4, header.Subchunk2Size);
+                wavStream.Write(writeBuffer4);
+            }
+            catch
+            {
+                throw new Exception("Write WAV header error.");
+            }
         }
 
         private WavHeader GetWavHeader(Stream wavStream)
@@ -140,12 +270,11 @@ namespace Iot.Device.Media
         private unsafe void WriteStream(Stream wavStream, WavHeader header, ref IntPtr @params, ref int dir)
         {
             ulong frames, bufferSize;
+
             fixed (int* dirP = &dir)
             {
-                if (Interop.snd_pcm_hw_params_get_period_size(@params, &frames, dirP) < 0)
-                {
-                    throw new Exception($"Error {Marshal.GetLastWin32Error()}. Can not get period size.");
-                }
+                errorNum = Interop.snd_pcm_hw_params_get_period_size(@params, &frames, dirP);
+                ThrowErrorMessage("Can not get period size.");
             }
 
             bufferSize = frames * header.BlockAlign * header.NumChannels;
@@ -158,62 +287,71 @@ namespace Iot.Device.Media
             {
                 while (wavStream.Read(readBuffer) != 0)
                 {
-                    if (Interop.snd_pcm_writei(pcm, (IntPtr)buffer, bufferSize) < 0)
-                    {
-                        throw new Exception($"Error {Marshal.GetLastWin32Error()}. Can not write buffer to the device.");
-                    }
+                    errorNum = Interop.snd_pcm_writei(playbackPcm, (IntPtr)buffer, bufferSize);
+                    ThrowErrorMessage("Can not write buffer to the device.");
                 }
             }
         }
 
-        private unsafe void PlayInitialize(WavHeader header, ref IntPtr @params, ref int dir)
+        private unsafe void ReadStream(Stream saveStream, WavHeader header, ref IntPtr @params, ref int dir)
         {
-            if (Interop.snd_pcm_hw_params_malloc(ref @params) < 0)
+            int errorNum;
+            ulong frames, bufferSize;
+
+            fixed (int* dirP = &dir)
             {
-                throw new Exception($"Error {Marshal.GetLastWin32Error()}. Can not allocate parameters object.");
+                errorNum = Interop.snd_pcm_hw_params_get_period_size(@params, &frames, dirP);
+                ThrowErrorMessage("Can not get period size.");
             }
 
-            if (Interop.snd_pcm_hw_params_any(pcm, @params) < 0)
-            {
-                throw new Exception($"Error {Marshal.GetLastWin32Error()}. Can not fill parameters object.");
-            }
+            bufferSize = frames * header.BlockAlign * header.NumChannels;
+            byte[] readBuffer = new byte[(int)bufferSize];
 
-            if (Interop.snd_pcm_hw_params_set_access(pcm, @params, snd_pcm_access_t.SND_PCM_ACCESS_RW_INTERLEAVED) < 0)
+            fixed (byte* buffer = readBuffer)
             {
-                throw new Exception($"Error {Marshal.GetLastWin32Error()}. Can not set access mode.");
-            }
+                for (int i = 0; i < (int)(header.Subchunk2Size / bufferSize); i++)
+                {
+                    errorNum = Interop.snd_pcm_readi(recordingPcm, (IntPtr)buffer, bufferSize);
+                    ThrowErrorMessage("Can not read buffer from the device.");
 
-            int error = (int)(header.BitsPerSample / 8) switch
+                    saveStream.Write(readBuffer);
+                    saveStream.Flush();
+                }
+            }
+        }
+
+        private unsafe void PcmInitialize(IntPtr pcm, WavHeader header, ref IntPtr @params, ref int dir)
+        {
+            errorNum = Interop.snd_pcm_hw_params_malloc(ref @params);
+            ThrowErrorMessage("Can not allocate parameters object.");
+
+            errorNum = Interop.snd_pcm_hw_params_any(pcm, @params);
+            ThrowErrorMessage("Can not fill parameters object.");
+
+            errorNum = Interop.snd_pcm_hw_params_set_access(pcm, @params, snd_pcm_access_t.SND_PCM_ACCESS_RW_INTERLEAVED);
+            ThrowErrorMessage("Can not set access mode.");
+
+            errorNum = (int)(header.BitsPerSample / 8) switch
             {
                 1 => Interop.snd_pcm_hw_params_set_format(pcm, @params, snd_pcm_format_t.SND_PCM_FORMAT_U8),
                 2 => Interop.snd_pcm_hw_params_set_format(pcm, @params, snd_pcm_format_t.SND_PCM_FORMAT_S16_LE),
                 3 => Interop.snd_pcm_hw_params_set_format(pcm, @params, snd_pcm_format_t.SND_PCM_FORMAT_S24_LE),
                 _ => throw new Exception("Bits per sample error."),
             };
+            ThrowErrorMessage("Can not set format.");
 
-            if (error < 0)
-            {
-                throw new Exception($"Error {Marshal.GetLastWin32Error()}. Can not set format.");
-            }
-
-            if (Interop.snd_pcm_hw_params_set_channels(pcm, @params, header.NumChannels) < 0)
-            {
-                throw new Exception($"Error {Marshal.GetLastWin32Error()}. Can not set channel.");
-            }
+            errorNum = Interop.snd_pcm_hw_params_set_channels(pcm, @params, header.NumChannels);
+            ThrowErrorMessage("Can not set channel.");
 
             uint val = header.SampleRate;
             fixed (int* dirP = &dir)
             {
-                if (Interop.snd_pcm_hw_params_set_rate_near(pcm, @params, &val, dirP) < 0)
-                {
-                    throw new Exception($"Error {Marshal.GetLastWin32Error()}. Can not set rate.");
-                }
+                errorNum = Interop.snd_pcm_hw_params_set_rate_near(pcm, @params, &val, dirP);
+                ThrowErrorMessage("Can not set rate.");
             }
 
-            if (Interop.snd_pcm_hw_params(pcm, @params) < 0)
-            {
-                throw new Exception($"Error {Marshal.GetLastWin32Error()}. Can not set hardware parameters.");
-            }
+            errorNum = Interop.snd_pcm_hw_params(pcm, @params);
+            ThrowErrorMessage("Can not set hardware parameters.");
         }
 
         private unsafe void SetVolume(long volume)
@@ -222,15 +360,11 @@ namespace Iot.Device.Media
 
             IntPtr elem = Interop.snd_mixer_first_elem(mixer);
 
-            if (Interop.snd_mixer_selem_set_playback_volume(elem, snd_mixer_selem_channel_id.SND_MIXER_SCHN_FRONT_LEFT, volume) < 0)
-            {
-                throw new Exception($"Error {Marshal.GetLastWin32Error()}. Set left channel volume error.");
-            }
+            errorNum = Interop.snd_mixer_selem_set_playback_volume(elem, snd_mixer_selem_channel_id.SND_MIXER_SCHN_FRONT_LEFT, volume);
+            ThrowErrorMessage("Set left channel volume error.");
 
-            if (Interop.snd_mixer_selem_set_playback_volume(elem, snd_mixer_selem_channel_id.SND_MIXER_SCHN_FRONT_RIGHT, volume) < 0)
-            {
-                throw new Exception($"Error {Marshal.GetLastWin32Error()}. Set right channel volume error.");
-            }
+            errorNum = Interop.snd_mixer_selem_set_playback_volume(elem, snd_mixer_selem_channel_id.SND_MIXER_SCHN_FRONT_RIGHT, volume);
+            ThrowErrorMessage("Set right channel volume error.");
 
             CloseMixer();
         }
@@ -242,47 +376,67 @@ namespace Iot.Device.Media
             long volume;
             IntPtr elem = Interop.snd_mixer_first_elem(mixer);
 
-            if (Interop.snd_mixer_selem_get_playback_volume(elem, snd_mixer_selem_channel_id.SND_MIXER_SCHN_FRONT_LEFT, &volume) < 0)
-            {
-                throw new Exception($"Error {Marshal.GetLastWin32Error()}. Get volume error.");
-            }
+            errorNum = Interop.snd_mixer_selem_get_playback_volume(elem, snd_mixer_selem_channel_id.SND_MIXER_SCHN_FRONT_LEFT, &volume);
+            ThrowErrorMessage("Get volume error.");
 
             CloseMixer();
 
             return volume;
         }
 
-        private void OpenPcm()
+        private void OpenPlaybackPcm()
         {
-            if (pcm != default)
+            if (playbackPcm != default)
             {
                 return;
             }
 
-            lock (pcmInitializationLock)
+            lock (playbackInitializationLock)
             {
-                if (Interop.snd_pcm_open(ref pcm, Settings.DeviceName, snd_pcm_stream_t.SND_PCM_STREAM_PLAYBACK, 0) < 0)
-                {
-                    throw new Exception($"Error {Marshal.GetLastWin32Error()}. Can not open sound device.");
-                }
+                errorNum = Interop.snd_pcm_open(ref playbackPcm, Settings.PlaybackDeviceName, snd_pcm_stream_t.SND_PCM_STREAM_PLAYBACK, 0);
+                ThrowErrorMessage("Can not open playback device.");
             }
         }
 
-        private void ClosePcm()
+        private void ClosePlaybackPcm()
         {
-            if (pcm != default)
+            if (playbackPcm != default)
             {
-                if (Interop.snd_pcm_drop(pcm) < 0)
-                {
-                    throw new Exception($"Error {Marshal.GetLastWin32Error()}. Drop sound device error.");
-                }
+                errorNum = Interop.snd_pcm_drop(playbackPcm);
+                ThrowErrorMessage("Drop playback device error.");
 
-                if (Interop.snd_pcm_close(pcm) < 0)
-                {
-                    throw new Exception($"Error {Marshal.GetLastWin32Error()}. Close sound device error.");
-                }
+                errorNum = Interop.snd_pcm_close(playbackPcm);
+                ThrowErrorMessage("Close playback device error.");
 
-                pcm = default;
+                playbackPcm = default;
+            }
+        }
+
+        private void OpenRecordingPcm()
+        {
+            if (recordingPcm != default)
+            {
+                return;
+            }
+
+            lock (recordingInitializationLock)
+            {
+                errorNum = Interop.snd_pcm_open(ref recordingPcm, Settings.RecordingDeviceName, snd_pcm_stream_t.SND_PCM_STREAM_CAPTURE, 0);
+                ThrowErrorMessage("Can not open recording device.");
+            }
+        }
+
+        private void CloseRecordingPcm()
+        {
+            if (recordingPcm != default)
+            {
+                errorNum = Interop.snd_pcm_drop(recordingPcm);
+                ThrowErrorMessage("Drop recording device error.");
+
+                errorNum = Interop.snd_pcm_close(recordingPcm);
+                ThrowErrorMessage("Close recording device error.");
+
+                recordingPcm = default;
             }
         }
 
@@ -295,25 +449,17 @@ namespace Iot.Device.Media
 
             lock (mixerInitializationLock)
             {
-                if (Interop.snd_mixer_open(ref mixer, 0) < 0)
-                {
-                    throw new Exception($"Error {Marshal.GetLastWin32Error()}. Can not open sound device mixer.");
-                }
+                errorNum = Interop.snd_mixer_open(ref mixer, 0);
+                ThrowErrorMessage("Can not open sound device mixer.");
 
-                if (Interop.snd_mixer_attach(mixer, Settings.DeviceName) < 0)
-                {
-                    throw new Exception($"Error {Marshal.GetLastWin32Error()}. Can not attach sound device mixer.");
-                }
+                errorNum = Interop.snd_mixer_attach(mixer, Settings.PlaybackDeviceName);
+                ThrowErrorMessage("Can not attach sound device mixer.");
 
-                if (Interop.snd_mixer_selem_register(mixer, IntPtr.Zero, IntPtr.Zero) < 0)
-                {
-                    throw new Exception($"Error {Marshal.GetLastWin32Error()}. Can not register sound device mixer.");
-                }
+                errorNum = Interop.snd_mixer_selem_register(mixer, IntPtr.Zero, IntPtr.Zero);
+                ThrowErrorMessage("Can not register sound device mixer.");
 
-                if (Interop.snd_mixer_load(mixer) < 0)
-                {
-                    throw new Exception($"Error {Marshal.GetLastWin32Error()}. Can not load sound device mixer.");
-                }
+                errorNum = Interop.snd_mixer_load(mixer);
+                ThrowErrorMessage("Can not load sound device mixer.");
             }
         }
 
@@ -321,10 +467,8 @@ namespace Iot.Device.Media
         {
             if (mixer != default)
             {
-                if (Interop.snd_mixer_close(mixer) < 0)
-                {
-                    throw new Exception($"Error {Marshal.GetLastWin32Error()}. Close sound device mixer error.");
-                }
+                errorNum = Interop.snd_mixer_close(mixer);
+                ThrowErrorMessage("Close sound device mixer error.");
 
                 mixer = default;
             }
@@ -335,9 +479,13 @@ namespace Iot.Device.Media
             base.Dispose(disposing);
         }
 
-        private string SndError(int errornum)
+        private void ThrowErrorMessage(string message)
         {
-            return Marshal.PtrToStringAnsi(Interop.snd_strerror(errornum));
+            if (errorNum < 0)
+            {
+                string errorMsg = Marshal.PtrToStringAnsi(Interop.snd_strerror(errorNum));
+                throw new Exception($"{message} Error {errorNum}. {errorMsg}");
+            }
         }
     }
 }
