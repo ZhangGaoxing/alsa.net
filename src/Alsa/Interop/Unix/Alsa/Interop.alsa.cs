@@ -73,62 +73,62 @@ internal partial class Interop
 
     /// <param name="mixer">snd_mixer_t**</param>
     [DllImport(AlsaLibrary)]
-    internal unsafe static extern int snd_mixer_open(ref IntPtr mixer, int mode);
+    internal static extern int snd_mixer_open(ref IntPtr mixer, int mode);
 
     [DllImport(AlsaLibrary)]
-    internal unsafe static extern int snd_mixer_close(IntPtr mixer);
+    internal static extern int snd_mixer_close(IntPtr mixer);
 
     [DllImport(AlsaLibrary)]
-    internal unsafe static extern int snd_mixer_attach(IntPtr mixer, string name);
+    internal static extern int snd_mixer_attach(IntPtr mixer, string name);
 
     [DllImport(AlsaLibrary)]
-    internal unsafe static extern int snd_mixer_load(IntPtr mixer);
+    internal static extern int snd_mixer_load(IntPtr mixer);
 
     [DllImport(AlsaLibrary)]
-    internal unsafe static extern int snd_mixer_selem_register(IntPtr mixer, IntPtr options, IntPtr classp);
+    internal static extern int snd_mixer_selem_register(IntPtr mixer, IntPtr options, IntPtr classp);
 
     /// <returns>snd_mixer_elem_t*</returns>
     [DllImport(AlsaLibrary)]
-    internal unsafe static extern IntPtr snd_mixer_first_elem(IntPtr mixer);
+    internal static extern IntPtr snd_mixer_first_elem(IntPtr mixer);
 
     [DllImport(AlsaLibrary)]
-    internal unsafe static extern IntPtr snd_mixer_elem_next(IntPtr elem);
+    internal static extern IntPtr snd_mixer_elem_next(IntPtr elem);
 
     /// <param name="elem">snd_mixer_elem_t*</param>
     [DllImport(AlsaLibrary)]
-    internal unsafe static extern string snd_mixer_selem_get_name(IntPtr elem);
+    internal static extern string snd_mixer_selem_get_name(IntPtr elem);
 
     [DllImport(AlsaLibrary)]
-    internal unsafe static extern void snd_mixer_selem_id_alloca(IntPtr ptr);
+    internal static extern void snd_mixer_selem_id_alloca(IntPtr ptr);
 
     /// <param name="mixer">snd_mixer_elem_t*</param>
     [DllImport(AlsaLibrary)]
     internal unsafe static extern int snd_mixer_selem_get_playback_volume(IntPtr elem, snd_mixer_selem_channel_id channel, long* value);
 
     [DllImport(AlsaLibrary)]
-    internal unsafe static extern int snd_mixer_selem_set_playback_volume(IntPtr elem, snd_mixer_selem_channel_id channel, long value);
+    internal static extern int snd_mixer_selem_set_playback_volume(IntPtr elem, snd_mixer_selem_channel_id channel, long value);
 
     [DllImport(AlsaLibrary)]
-    internal unsafe static extern int snd_mixer_selem_set_playback_volume_all(IntPtr elem, long value);
+    internal static extern int snd_mixer_selem_set_playback_volume_all(IntPtr elem, long value);
 
     [DllImport(AlsaLibrary)]
     internal unsafe static extern int snd_mixer_selem_get_playback_volume_range(IntPtr elem, long* min, long* max);
 
     [DllImport(AlsaLibrary)]
-    internal unsafe static extern int snd_mixer_selem_set_playback_volume_range(IntPtr elem, long min, long max);
+    internal static extern int snd_mixer_selem_set_playback_volume_range(IntPtr elem, long min, long max);
 
     [DllImport(AlsaLibrary)]
     internal unsafe static extern int snd_mixer_selem_get_capture_volume(IntPtr elem, snd_mixer_selem_channel_id channel, long* value);
 
     [DllImport(AlsaLibrary)]
-    internal unsafe static extern int snd_mixer_selem_set_capture_volume(IntPtr elem, snd_mixer_selem_channel_id channel, long value);
+    internal static extern int snd_mixer_selem_set_capture_volume(IntPtr elem, snd_mixer_selem_channel_id channel, long value);
 
     [DllImport(AlsaLibrary)]
-    internal unsafe static extern int snd_mixer_selem_set_capture_volume_all(IntPtr elem, long value);
+    internal static extern int snd_mixer_selem_set_capture_volume_all(IntPtr elem, long value);
 
     [DllImport(AlsaLibrary)]
     internal unsafe static extern int snd_mixer_selem_get_capture_volume_range(IntPtr elem, long* min, long* max);
 
     [DllImport(AlsaLibrary)]
-    internal unsafe static extern int snd_mixer_selem_set_capture_volume_range(IntPtr elem, long min, long max);
+    internal static extern int snd_mixer_selem_set_capture_volume_range(IntPtr elem, long min, long max);
 }
