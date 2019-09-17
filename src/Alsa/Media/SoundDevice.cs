@@ -25,7 +25,12 @@ namespace Iot.Device.Media
         /// <summary>
         /// The playback volume of the sound device.
         /// </summary>
-        public abstract long Volume { get; set; }
+        public abstract long PlaybackVolume { get; set; }
+
+        /// <summary>
+        /// The recording volume of the sound device.
+        /// </summary>
+        public abstract long RecordingVolume { get; set; }
 
         /// <summary>
         /// Play WAV file.

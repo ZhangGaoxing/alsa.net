@@ -16,6 +16,11 @@
         public string RecordingDeviceName { get; set; } = "default";
 
         /// <summary>
+        /// The mixer device name of the sound device is connected to.
+        /// </summary>
+        public string MixerDeviceName { get; set; } = "default";
+
+        /// <summary>
         /// The sample rate of recording.
         /// </summary>
         public uint RecordingSampleRate { get; set; } = 8000;

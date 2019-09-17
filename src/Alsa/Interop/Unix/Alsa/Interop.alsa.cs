@@ -99,7 +99,7 @@ internal partial class Interop
     internal unsafe static extern string snd_mixer_selem_get_name(IntPtr elem);
 
     [DllImport(AlsaLibrary)]
-    internal unsafe static extern int snd_mixer_selem_get_capture_volume_range(IntPtr elem, long* min, long* max);
+    internal unsafe static extern void snd_mixer_selem_id_alloca(IntPtr ptr);
 
     /// <param name="mixer">snd_mixer_elem_t*</param>
     [DllImport(AlsaLibrary)]
@@ -107,4 +107,28 @@ internal partial class Interop
 
     [DllImport(AlsaLibrary)]
     internal unsafe static extern int snd_mixer_selem_set_playback_volume(IntPtr elem, snd_mixer_selem_channel_id channel, long value);
+
+    [DllImport(AlsaLibrary)]
+    internal unsafe static extern int snd_mixer_selem_set_playback_volume_all(IntPtr elem, long value);
+
+    [DllImport(AlsaLibrary)]
+    internal unsafe static extern int snd_mixer_selem_get_playback_volume_range(IntPtr elem, long* min, long* max);
+
+    [DllImport(AlsaLibrary)]
+    internal unsafe static extern int snd_mixer_selem_set_playback_volume_range(IntPtr elem, long min, long max);
+
+    [DllImport(AlsaLibrary)]
+    internal unsafe static extern int snd_mixer_selem_get_capture_volume(IntPtr elem, snd_mixer_selem_channel_id channel, long* value);
+
+    [DllImport(AlsaLibrary)]
+    internal unsafe static extern int snd_mixer_selem_set_capture_volume(IntPtr elem, snd_mixer_selem_channel_id channel, long value);
+
+    [DllImport(AlsaLibrary)]
+    internal unsafe static extern int snd_mixer_selem_set_capture_volume_all(IntPtr elem, long value);
+
+    [DllImport(AlsaLibrary)]
+    internal unsafe static extern int snd_mixer_selem_get_capture_volume_range(IntPtr elem, long* min, long* max);
+
+    [DllImport(AlsaLibrary)]
+    internal unsafe static extern int snd_mixer_selem_set_capture_volume_range(IntPtr elem, long min, long max);
 }

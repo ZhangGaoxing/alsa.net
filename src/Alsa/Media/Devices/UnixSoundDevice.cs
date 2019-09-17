@@ -16,6 +16,7 @@ namespace Iot.Device.Media
         private IntPtr playbackPcm;
         private IntPtr recordingPcm;
         private IntPtr mixer;
+        private IntPtr elem;
         private int errorNum;
         private static readonly object playbackInitializationLock = new object();
         private static readonly object recordingInitializationLock = new object();
@@ -29,7 +30,12 @@ namespace Iot.Device.Media
         /// <summary>
         /// The playback volume of the sound device.
         /// </summary>
-        public override long Volume { get => GetVolume(); set => SetVolume(value); }
+        public override long PlaybackVolume { get => GetPlaybackVolume(); set => SetPlaybackVolume(value); }
+
+        /// <summary>
+        /// The recording volume of the sound device.
+        /// </summary>
+        public override long RecordingVolume { get => GetRecordingVolume(); set => SetRecordingVolume(value); }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="UnixSoundDevice"/> class that will use the specified settings to communicate with the sound device.
@@ -366,34 +372,56 @@ namespace Iot.Device.Media
             ThrowErrorMessage("Can not set hardware parameters.");
         }
 
-        private unsafe void SetVolume(long volume)
+        private unsafe void SetPlaybackVolume(long volume)
         {
             OpenMixer();
 
-            IntPtr elem = Interop.snd_mixer_first_elem(mixer);
-
             errorNum = Interop.snd_mixer_selem_set_playback_volume(elem, snd_mixer_selem_channel_id.SND_MIXER_SCHN_FRONT_LEFT, volume);
-            ThrowErrorMessage("Set left channel volume error.");
-
             errorNum = Interop.snd_mixer_selem_set_playback_volume(elem, snd_mixer_selem_channel_id.SND_MIXER_SCHN_FRONT_RIGHT, volume);
-            ThrowErrorMessage("Set right channel volume error.");
+            ThrowErrorMessage("Set playback volume error.");
 
             CloseMixer();
         }
 
-        private unsafe long GetVolume()
+        private unsafe long GetPlaybackVolume()
         {
+            long volumeLeft, volumeRight;
+
             OpenMixer();
 
-            long volume;
-            IntPtr elem = Interop.snd_mixer_first_elem(mixer);
-
-            errorNum = Interop.snd_mixer_selem_get_playback_volume(elem, snd_mixer_selem_channel_id.SND_MIXER_SCHN_FRONT_LEFT, &volume);
-            ThrowErrorMessage("Get volume error.");
+            errorNum = Interop.snd_mixer_selem_get_playback_volume(elem, snd_mixer_selem_channel_id.SND_MIXER_SCHN_FRONT_LEFT, &volumeLeft);
+            errorNum = Interop.snd_mixer_selem_get_playback_volume(elem, snd_mixer_selem_channel_id.SND_MIXER_SCHN_FRONT_RIGHT, &volumeRight);
+            ThrowErrorMessage("Get playback volume error.");
 
             CloseMixer();
 
-            return volume;
+            return (volumeLeft + volumeRight) / 2;
+        }
+
+        private unsafe void SetRecordingVolume(long volume)
+        {
+            OpenMixer();
+
+            errorNum = Interop.snd_mixer_selem_set_capture_volume(elem, snd_mixer_selem_channel_id.SND_MIXER_SCHN_FRONT_LEFT, volume);
+            errorNum = Interop.snd_mixer_selem_set_capture_volume(elem, snd_mixer_selem_channel_id.SND_MIXER_SCHN_FRONT_RIGHT, volume);
+            ThrowErrorMessage("Set recording volume error.");
+
+            CloseMixer();
+        }
+
+        private unsafe long GetRecordingVolume()
+        {
+            long volumeLeft, volumeRight;
+
+            OpenMixer();
+
+            errorNum = Interop.snd_mixer_selem_get_capture_volume(elem, snd_mixer_selem_channel_id.SND_MIXER_SCHN_FRONT_LEFT, &volumeLeft);
+            errorNum = Interop.snd_mixer_selem_get_capture_volume(elem, snd_mixer_selem_channel_id.SND_MIXER_SCHN_FRONT_RIGHT, &volumeRight);
+            ThrowErrorMessage("Get recording volume error.");
+
+            CloseMixer();
+
+            return (volumeLeft + volumeRight) / 2;
         }
 
         private void OpenPlaybackPcm()
@@ -464,7 +492,7 @@ namespace Iot.Device.Media
                 errorNum = Interop.snd_mixer_open(ref mixer, 0);
                 ThrowErrorMessage("Can not open sound device mixer.");
 
-                errorNum = Interop.snd_mixer_attach(mixer, Settings.PlaybackDeviceName);
+                errorNum = Interop.snd_mixer_attach(mixer, Settings.MixerDeviceName);
                 ThrowErrorMessage("Can not attach sound device mixer.");
 
                 errorNum = Interop.snd_mixer_selem_register(mixer, IntPtr.Zero, IntPtr.Zero);
@@ -472,6 +500,8 @@ namespace Iot.Device.Media
 
                 errorNum = Interop.snd_mixer_load(mixer);
                 ThrowErrorMessage("Can not load sound device mixer.");
+
+                elem = Interop.snd_mixer_first_elem(mixer);
             }
         }
 
@@ -483,6 +513,7 @@ namespace Iot.Device.Media
                 ThrowErrorMessage("Close sound device mixer error.");
 
                 mixer = default;
+                elem = default;
             }
         }
 

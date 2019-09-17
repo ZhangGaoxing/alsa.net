@@ -12,11 +12,11 @@ namespace Alsa.Samples
             SoundConnectionSettings settings = new SoundConnectionSettings();
             SoundDevice device = SoundDevice.Create(settings);
 
-            await device.PlayAsync("/home/pi/1.wav", CancellationToken.None);
+            //await device.PlayAsync("/home/pi/1.wav", CancellationToken.None);
             //await device.ReccordAsync(10, "/home/pi/recording.wav", CancellationToken.None);
 
-            //device.Volume = 10;
-            //Console.WriteLine(device.Volume);
+            device.PlaybackVolume = 400;
+            Console.WriteLine(device.PlaybackVolume);
 
             Console.ReadKey();
         }
