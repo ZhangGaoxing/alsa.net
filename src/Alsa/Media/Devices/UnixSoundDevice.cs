@@ -295,7 +295,7 @@ namespace Iot.Device.Media
                 ThrowErrorMessage("Can not get period size.");
             }
 
-            bufferSize = frames * header.BlockAlign * header.NumChannels;
+            bufferSize = frames * header.BlockAlign;
             // In Interop, the frames is defined as ulong. But actucally, the value of bufferSize won't be too big.
             byte[] readBuffer = new byte[(int)bufferSize];
             // Jump wav header.
@@ -305,7 +305,7 @@ namespace Iot.Device.Media
             {
                 while (wavStream.Read(readBuffer) != 0)
                 {
-                    errorNum = Interop.snd_pcm_writei(playbackPcm, (IntPtr)buffer, bufferSize);
+                    errorNum = Interop.snd_pcm_writei(playbackPcm, (IntPtr)buffer, frames);
                     ThrowErrorMessage("Can not write buffer to the device.");
                 }
             }
@@ -322,14 +322,14 @@ namespace Iot.Device.Media
                 ThrowErrorMessage("Can not get period size.");
             }
 
-            bufferSize = frames * header.BlockAlign * header.NumChannels;
+            bufferSize = frames * header.BlockAlign;
             byte[] readBuffer = new byte[(int)bufferSize];
 
             fixed (byte* buffer = readBuffer)
             {
                 for (int i = 0; i < (int)(header.Subchunk2Size / bufferSize); i++)
                 {
-                    errorNum = Interop.snd_pcm_readi(recordingPcm, (IntPtr)buffer, bufferSize);
+                    errorNum = Interop.snd_pcm_readi(recordingPcm, (IntPtr)buffer, frames);
                     ThrowErrorMessage("Can not read buffer from the device.");
 
                     saveStream.Write(readBuffer);
@@ -527,7 +527,7 @@ namespace Iot.Device.Media
             if (errorNum < 0)
             {
                 string errorMsg = Marshal.PtrToStringAnsi(Interop.snd_strerror(errorNum));
-                throw new Exception($"{message} Error {errorNum}. {errorMsg}");
+                throw new Exception($"{message}\nError {errorNum}. {errorMsg}.");
             }
         }
     }
