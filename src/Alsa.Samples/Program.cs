@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Threading;
 using System.Threading.Tasks;
 using Iot.Device.Media;
 
@@ -12,9 +11,20 @@ namespace Alsa.Samples
             SoundConnectionSettings settings = new SoundConnectionSettings();
             using SoundDevice device = SoundDevice.Create(settings);
 
-            device.Play("/home/pi/44.wav");
+            Task.Run(() =>
+            {
+                device.Play("/home/pi/44.wav");
+            });
 
-            Console.WriteLine("Play stop.");
+            while (true)
+            {
+                if (Console.ReadKey() != null)
+                {
+                    device.PlaybackMute = !device.PlaybackMute;
+                }
+            }
+
+            //Console.WriteLine("Play stop.");
         }
     }
 }

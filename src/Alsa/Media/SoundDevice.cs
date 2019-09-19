@@ -1,7 +1,5 @@
 ﻿using System;
 using System.IO;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Iot.Device.Media
 {
@@ -28,9 +26,19 @@ namespace Iot.Device.Media
         public abstract long PlaybackVolume { get; set; }
 
         /// <summary>
+        /// The playback mute of the sound device.
+        /// </summary>
+        public abstract bool PlaybackMute { get; set; }
+
+        /// <summary>
         /// The recording volume of the sound device.
         /// </summary>
         public abstract long RecordingVolume { get; set; }
+
+        /// <summary>
+        /// The recording mute of the sound device.
+        /// </summary>
+        public abstract bool RecordingMute { get; set; }
 
         /// <summary>
         /// Play WAV file.

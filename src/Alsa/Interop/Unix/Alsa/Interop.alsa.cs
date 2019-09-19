@@ -112,6 +112,9 @@ internal partial class Interop
     internal static extern int snd_mixer_selem_set_playback_volume_all(IntPtr elem, long value);
 
     [DllImport(AlsaLibrary)]
+    internal static extern int snd_mixer_selem_set_playback_switch_all(IntPtr elem, int value);
+
+    [DllImport(AlsaLibrary)]
     internal unsafe static extern int snd_mixer_selem_get_playback_volume_range(IntPtr elem, long* min, long* max);
 
     [DllImport(AlsaLibrary)]
@@ -125,6 +128,9 @@ internal partial class Interop
 
     [DllImport(AlsaLibrary)]
     internal static extern int snd_mixer_selem_set_capture_volume_all(IntPtr elem, long value);
+
+    [DllImport(AlsaLibrary)]
+    internal static extern int snd_mixer_selem_set_capture_switch_all(IntPtr elem, int value);
 
     [DllImport(AlsaLibrary)]
     internal unsafe static extern int snd_mixer_selem_get_capture_volume_range(IntPtr elem, long* min, long* max);
