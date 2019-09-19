@@ -50,89 +50,18 @@ namespace Iot.Device.Media
         /// Play WAV file.
         /// </summary>
         /// <param name="wavPath">WAV file path.</param>
-        /// <param name="token">A cancellation token that can be used to cancel the work.</param>
-        public override async Task PlayAsync(string wavPath, CancellationToken token)
+        public override void Play(string wavPath)
         {
             using FileStream fs = File.Open(wavPath, FileMode.Open);
 
-            try
-            {
-                await Task.Run(() =>
-                {
-                    Play(fs);
-                }, token);
-            }
-            catch (TaskCanceledException)
-            {
-                ClosePlaybackPcm();
-            }
+            Play(fs);
         }
 
         /// <summary>
         /// Play WAV file.
         /// </summary>
         /// <param name="wavStream">WAV stream.</param>
-        /// <param name="token">A cancellation token that can be used to cancel the work.</param>
-        public override async Task PlayAsync(Stream wavStream, CancellationToken token)
-        {
-            try
-            {
-                await Task.Run(() =>
-                {
-                    Play(wavStream);
-                }, token);
-            }
-            catch (TaskCanceledException)
-            {
-                ClosePlaybackPcm();
-            }
-        }
-
-        /// <summary>
-        /// Sound recording.
-        /// </summary>
-        /// <param name="second">Recording duration(In seconds).</param>
-        /// <param name="savePath">Recording save path.</param>
-        /// <param name="token">A cancellation token that can be used to cancel the work.</param>
-        public override async Task ReccordAsync(uint second, string savePath, CancellationToken token)
-        {
-            using FileStream fs = File.Open(savePath, FileMode.CreateNew);
-
-            try
-            {
-                await Task.Run(() =>
-                {
-                    Record(fs, second);
-                }, token);
-            }
-            catch (TaskCanceledException)
-            {
-                CloseRecordingPcm();
-            }
-        }
-
-        /// <summary>
-        /// Sound recording.
-        /// </summary>
-        /// <param name="second">Recording duration(In seconds).</param>
-        /// <param name="saveStream">Recording save stream.</param>
-        /// <param name="token">A cancellation token that can be used to cancel the work.</param>
-        public override async Task ReccordAsync(uint second, Stream saveStream, CancellationToken token)
-        {
-            try
-            {
-                await Task.Run(() =>
-                {
-                    Record(saveStream, second);
-                }, token);
-            }
-            catch (TaskCanceledException)
-            {
-                ClosePlaybackPcm();
-            }
-        }
-
-        private void Play(Stream wavStream)
+        public override void Play(Stream wavStream)
         {
             IntPtr @params = new IntPtr();
             int dir = 0;
@@ -144,7 +73,24 @@ namespace Iot.Device.Media
             ClosePlaybackPcm();
         }
 
-        private void Record(Stream saveStream, uint second)
+        /// <summary>
+        /// Sound recording.
+        /// </summary>
+        /// <param name="second">Recording duration(In seconds).</param>
+        /// <param name="savePath">Recording save path.</param>
+        public override void Record(uint second, string savePath)
+        {
+            using FileStream fs = File.Open(savePath, FileMode.CreateNew);
+
+            Record(second, fs);
+        }
+
+        /// <summary>
+        /// Sound recording.
+        /// </summary>
+        /// <param name="second">Recording duration(In seconds).</param>
+        /// <param name="saveStream">Recording save stream.</param>
+        public override void Record(uint second, Stream saveStream)
         {
             IntPtr @params = new IntPtr();
             int dir = 0;
@@ -519,6 +465,10 @@ namespace Iot.Device.Media
 
         protected override void Dispose(bool disposing)
         {
+            ClosePlaybackPcm();
+            CloseRecordingPcm();
+            CloseMixer();
+
             base.Dispose(disposing);
         }
 

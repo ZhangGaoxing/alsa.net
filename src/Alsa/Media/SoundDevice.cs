@@ -36,31 +36,27 @@ namespace Iot.Device.Media
         /// Play WAV file.
         /// </summary>
         /// <param name="wavPath">WAV file path.</param>
-        /// <param name="token">A cancellation token that can be used to cancel the work.</param>
-        public abstract Task PlayAsync(string wavPath, CancellationToken token);
+        public abstract void Play(string wavPath);
 
         /// <summary>
         /// Play WAV file.
         /// </summary>
         /// <param name="wavStream">WAV stream.</param>
-        /// <param name="token">A cancellation token that can be used to cancel the work.</param>
-        public abstract Task PlayAsync(Stream wavStream, CancellationToken token);
+        public abstract void Play(Stream wavStream);
 
         /// <summary>
         /// Sound recording.
         /// </summary>
         /// <param name="second">Recording duration(In seconds).</param>
         /// <param name="savePath">Recording save path.</param>
-        /// <param name="token">A cancellation token that can be used to cancel the work.</param>
-        public abstract Task ReccordAsync(uint second, string savePath, CancellationToken token);
+        public abstract void Record(uint second, string savePath);
 
         /// <summary>
         /// Sound recording.
         /// </summary>
         /// <param name="second">Recording duration(In seconds).</param>
         /// <param name="saveStream">Recording save stream.</param>
-        /// <param name="token">A cancellation token that can be used to cancel the work.</param>
-        public abstract Task ReccordAsync(uint second, Stream saveStream, CancellationToken token);
+        public abstract void Record(uint second, Stream saveStream);
 
         /// <inheritdoc/>
         public void Dispose()

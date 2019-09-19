@@ -7,18 +7,14 @@ namespace Alsa.Samples
 {
     class Program
     {
-        static async Task Main(string[] args)
+        static void Main(string[] args)
         {
             SoundConnectionSettings settings = new SoundConnectionSettings();
-            SoundDevice device = SoundDevice.Create(settings);
+            using SoundDevice device = SoundDevice.Create(settings);
 
-            await device.PlayAsync("/home/pi/20.wav", CancellationToken.None);
-            //await device.ReccordAsync(10, "/home/pi/recording.wav", CancellationToken.None);
+            device.Play("/home/pi/44.wav");
 
-            //device.PlaybackVolume = 400;
-            //Console.WriteLine(device.PlaybackVolume);
-
-            Console.ReadKey();
+            Console.WriteLine("Play stop.");
         }
     }
 }
