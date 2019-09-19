@@ -1,5 +1,8 @@
-﻿using System;
-using System.Threading.Tasks;
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+using System;
 using Iot.Device.Media;
 
 namespace Alsa.Samples
@@ -11,20 +14,9 @@ namespace Alsa.Samples
             SoundConnectionSettings settings = new SoundConnectionSettings();
             using SoundDevice device = SoundDevice.Create(settings);
 
-            Task.Run(() =>
-            {
-                device.Play("/home/pi/44.wav");
-            });
+            device.Play("/home/pi/44.wav");
 
-            while (true)
-            {
-                if (Console.ReadKey() != null)
-                {
-                    device.PlaybackMute = !device.PlaybackMute;
-                }
-            }
-
-            //Console.WriteLine("Play stop.");
+            Console.WriteLine("Play stop.");
         }
     }
 }

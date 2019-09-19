@@ -1,4 +1,8 @@
-﻿internal enum snd_pcm_stream_t
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+internal enum snd_pcm_stream_t
 {
     SND_PCM_STREAM_PLAYBACK = 0,
     SND_PCM_STREAM_CAPTURE = 1,
