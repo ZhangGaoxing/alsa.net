@@ -122,7 +122,7 @@ namespace Iot.Device.Media
         /// <param name="savePath">Recording save path.</param>
         public override void Record(uint second, string savePath)
         {
-            using FileStream fs = File.Open(savePath, FileMode.CreateNew);
+            using FileStream fs = File.Open(savePath, FileMode.Create);
 
             Record(second, fs);
         }
@@ -294,36 +294,36 @@ namespace Iot.Device.Media
                 while (wavStream.Read(readBuffer) != 0)
                 {
                     _errorNum = Interop.snd_pcm_writei(_playbackPcm, (IntPtr)buffer, frames);
-                    ThrowErrorMessage("Can not write buffer to the device.");
+                    ThrowErrorMessage("Can not write data to the device.");
                 }
             }
         }
 
         private unsafe void ReadStream(Stream saveStream, WavHeader header, ref IntPtr @params, ref int dir)
         {
-            int errorNum;
             ulong frames, bufferSize;
 
             fixed (int* dirP = &dir)
             {
-                errorNum = Interop.snd_pcm_hw_params_get_period_size(@params, &frames, dirP);
+                _errorNum = Interop.snd_pcm_hw_params_get_period_size(@params, &frames, dirP);
                 ThrowErrorMessage("Can not get period size.");
             }
 
             bufferSize = frames * header.BlockAlign;
             byte[] readBuffer = new byte[(int)bufferSize];
+            saveStream.Position = 44;
 
             fixed (byte* buffer = readBuffer)
             {
                 for (int i = 0; i < (int)(header.Subchunk2Size / bufferSize); i++)
                 {
-                    errorNum = Interop.snd_pcm_readi(_recordingPcm, (IntPtr)buffer, frames);
-                    ThrowErrorMessage("Can not read buffer from the device.");
+                    _errorNum = Interop.snd_pcm_readi(_recordingPcm, (IntPtr)buffer, frames);
+                    ThrowErrorMessage("Can not read data from the device.");
 
                     saveStream.Write(readBuffer);
-                    saveStream.Flush();
                 }
             }
+            saveStream.Flush();
         }
 
         private unsafe void PcmInitialize(IntPtr pcm, WavHeader header, ref IntPtr @params, ref int dir)
@@ -342,7 +342,7 @@ namespace Iot.Device.Media
                 1 => Interop.snd_pcm_hw_params_set_format(pcm, @params, snd_pcm_format_t.SND_PCM_FORMAT_U8),
                 2 => Interop.snd_pcm_hw_params_set_format(pcm, @params, snd_pcm_format_t.SND_PCM_FORMAT_S16_LE),
                 3 => Interop.snd_pcm_hw_params_set_format(pcm, @params, snd_pcm_format_t.SND_PCM_FORMAT_S24_LE),
-                _ => throw new Exception("Bits per sample error."),
+                _ => throw new Exception("Bits per sample error. Please reset the value of RecordingBitsPerSample."),
             };
             ThrowErrorMessage("Can not set format.");
 
@@ -540,8 +540,11 @@ namespace Iot.Device.Media
         {
             if (_errorNum < 0)
             {
+                int code = _errorNum;
                 string errorMsg = Marshal.PtrToStringAnsi(Interop.snd_strerror(_errorNum));
-                throw new Exception($"{message}\nError {_errorNum}. {errorMsg}.");
+
+                Dispose();
+                throw new Exception($"{message}\nError {code}. {errorMsg}.");
             }
         }
     }

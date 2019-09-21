@@ -71,6 +71,9 @@ internal partial class Interop
     [DllImport(AlsaLibrary)]
     internal unsafe static extern int snd_pcm_hw_params_get_period_size(IntPtr @params, ulong* frames, int* dir);
 
+    [DllImport(AlsaLibrary)]
+    internal unsafe static extern int snd_pcm_hw_params_set_period_size_near(IntPtr pcm, IntPtr @params, ulong* frames, int* dir);
+
     /// <param name="mixer">snd_mixer_t**</param>
     [DllImport(AlsaLibrary)]
     internal static extern int snd_mixer_open(ref IntPtr mixer, int mode);
