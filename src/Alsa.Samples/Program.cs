@@ -15,19 +15,11 @@ namespace Alsa.Samples
             SoundConnectionSettings settings = new SoundConnectionSettings();
             using SoundDevice device = SoundDevice.Create(settings);
 
-            Task.Run(() =>
-            {
-                device.Play("/home/pi/44.wav");
-                Console.WriteLine("Play stop.");
-            });
-
-            Task.Run(() =>
-            {
-                device.Record(30, "/home/pi/record.wav");
-                Console.WriteLine("Record stop.");
-            });
-
-            Console.ReadKey();
+            Console.WriteLine("Recording...");
+            device.Record(10, "/home/pi/record.wav");
+            
+            Console.WriteLine("Playing...");
+            device.Play("/home/pi/record.wav");
         }
     }
 }
